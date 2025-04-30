@@ -1,6 +1,5 @@
 import pandas as pd
 import re
-import os
 from datetime import datetime
 
 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -47,8 +46,14 @@ print("Address fields combined into 'FullAddress'.")
 
 # Extract 5-digit postcode using regex
 print("\nStep 5: Extracting 5-digit postcode from the full address...")
-df["Postcode"] = df["FullAddress"].apply(lambda x: re.search(r"\b\d{5}\b", x))
-df["Postcode"] = df["Postcode"].apply(lambda x: x.group() if x else None)
+
+
+def extract_postcode(address):
+    matches = re.findall(r"\b\d{5}\b", address)
+    return matches[-1] if matches else None
+
+
+df["Postcode"] = df["FullAddress"].apply(extract_postcode)
 print("Postcode extraction complete.")
 
 # Lookup City and State from db.csv
@@ -115,8 +120,8 @@ output_df = pd.DataFrame(
         "address.city": df.get("City", ""),
         "address.district": df.get("City", ""),
         "address.postCode": df.get("Postcode", ""),
-        "address.areaCode": df.get("areaCode", ""),
-        "address.zone": df.get("zone", ""),
+        "address.areaCode": df.get("areaCode", "TBA"),
+        "address.zone": df.get("zone", "TBA"),
         "address.location.type": "",
         "address.location.coordinates": "",
         "address.phone": df.get("CustomerTel", ""),
