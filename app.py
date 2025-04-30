@@ -6,6 +6,7 @@ ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 INPUT_FILE_PATH = "./input.csv"
 OUTPUT_FILE_PATH = f"./output_{ts}.csv"
 ADDRESS_COLUMNS = ["CustomerAdd1", "CustomerAdd2", "CustomerAdd3", "CustomerAdd4"]
+DEFAULT_IF_REQUIRED_NOT_FOUND = "TBA"
 
 # {'billing', 'customs', 'depot', 'forwarder', 'freightForwarder', 'haulier', 'liner', 'oneTimeVendor', 'port', 'shipperConsignee', 'shippingAgent', 'transporter', 'warehouse'}
 COMPANY_TYPES = ["shipperConsignee"]
@@ -110,7 +111,7 @@ output_df = pd.DataFrame(
         # --- UUID ---
         "uuid": "",
         # --- Address ---
-        "address.name": df.get("CustomerName", ""),
+        "address.name": df.get("CustomerName", DEFAULT_IF_REQUIRED_NOT_FOUND),
         "address.type": ADDRESS_TYPE,
         "address.countryAlpha3": "MYS",
         "address.address1": df.get("CustomerAdd1", ""),
@@ -120,8 +121,8 @@ output_df = pd.DataFrame(
         "address.city": df.get("City", ""),
         "address.district": df.get("City", ""),
         "address.postCode": df.get("Postcode", ""),
-        "address.areaCode": df.get("areaCode", "TBA"),
-        "address.zone": df.get("zone", "TBA"),
+        "address.areaCode": df.get("areaCode", DEFAULT_IF_REQUIRED_NOT_FOUND),
+        "address.zone": df.get("zone", DEFAULT_IF_REQUIRED_NOT_FOUND),
         "address.location.type": "",
         "address.location.coordinates": "",
         "address.phone": df.get("CustomerTel", ""),
