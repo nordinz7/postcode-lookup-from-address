@@ -81,17 +81,24 @@ def get_debtor_code(row):
     return ""
 
 
+# Ensure 'CustomerName' is not empty; if empty, set to DEFAULT_IF_REQUIRED_NOT_FOUND
+name_filled = (
+    df.get("CustomerName", "")
+    .fillna("")
+    .apply(lambda x: x if str(x).strip() else DEFAULT_IF_REQUIRED_NOT_FOUND)
+)
+
 output_df = pd.DataFrame(
     {
         # --- General Info ---
         "no": "",
         "code": df.get("CustomerCode", ""),
-        "name": df.get("CustomerName", ""),
+        "name": name_filled,
         "description": "",
         "status": "activated",
         "tags": "",
         "overrideDuplicateCode": True,
-        "types": [COMPANY_TYPES] * len(df),
+        "types": COMPANY_TYPES * len(df),
         # --- Country & Currency ---
         "country.name": "Malaysia",
         "country.alpha3": "MYS",
@@ -114,20 +121,20 @@ output_df = pd.DataFrame(
         "address.name": df.get("CustomerName", DEFAULT_IF_REQUIRED_NOT_FOUND),
         "address.type": ADDRESS_TYPE,
         "address.countryAlpha3": "MYS",
-        "address.address1": df.get("CustomerAdd1", ""),
-        "address.address2": df.get("CustomerAdd2", ""),
-        "address.address3": df.get("CustomerAdd3", ""),
-        "address.address4": df.get("CustomerAdd4", ""),
-        "address.city": df.get("City", ""),
-        "address.district": df.get("City", ""),
-        "address.postCode": df.get("Postcode", ""),
+        "address.address1": df.get("CustomerAdd1", "").apply(str),
+        "address.address2": df.get("CustomerAdd2", "").apply(str),
+        "address.address3": df.get("CustomerAdd3", "").apply(str),
+        "address.address4": df.get("CustomerAdd4", "").apply(str),
+        "address.city": df.get("City", "").apply(str),
+        "address.district": df.get("City", "").apply(str),
+        "address.postCode": df.get("Postcode", "").apply(str),
         "address.areaCode": df.get("areaCode", DEFAULT_IF_REQUIRED_NOT_FOUND),
         "address.zone": df.get("zone", DEFAULT_IF_REQUIRED_NOT_FOUND),
         "address.location.type": "",
         "address.location.coordinates": "",
-        "address.phone": df.get("CustomerTel", ""),
-        "address.fax": df.get("CustomerFax", ""),
-        "address.tags": [["isDefault"]] * len(df),
+        "address.phone": df.get("CustomerTel", "").apply(str),
+        "address.fax": df.get("CustomerFax", "").apply(str),
+        "address.tags": ["isDefault"] * len(df),
         "address.status": "activated",
         "address.uuid": "",
         "address.zzz": "",
