@@ -3,31 +3,33 @@ import re
 import os
 from datetime import datetime
 
+ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+INPUT_FILE_PATH = "./input.csv"
+OUTPUT_FILE_PATH = f"./output_{ts}.csv"
+ADDRESS_COLUMNS = ["CustomerAdd1", "CustomerAdd2", "CustomerAdd3", "CustomerAdd4"]
 
-# Load the uploaded CSV file
-file_path = "./input.csv"
+# {'billing', 'customs', 'depot', 'forwarder', 'freightForwarder', 'haulier', 'liner', 'oneTimeVendor', 'port', 'shipperConsignee', 'shippingAgent', 'transporter', 'warehouse'}
+COMPANY_TYPES = ["shipperConsignee"]
+
+# {'BILLING', 'CONTACT', 'DELIVERY', 'MAILING', 'WAREHOUSE'}
+ADDRESS_TYPE = "BILLING"
 
 try:
     print("Step 1: Loading the uploaded CSV file...")
-    df = pd.read_csv(file_path)
+    df = pd.read_csv(INPUT_FILE_PATH)
     print("CSV file loaded successfully.")
 except FileNotFoundError:
     print(
-        f"ERROR: The file '{file_path}' was not found. Please check the file name and location."
+        f"ERROR: The file '{INPUT_FILE_PATH}' was not found. Please check the file name and location."
     )
     exit(1)
 except Exception as e:
     print(f"ERROR: Could not load the CSV file. Details: {e}")
     exit(1)
 
-# Generate output file name based on input file name and timestamp
-base_name = os.path.splitext(os.path.basename(file_path))[0]
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-output_file_path = f"./{base_name}_GENERATED_{timestamp}.csv"
 
 print("\nStep 2: Checking for required address columns...")
-required_columns = ["CustomerAdd1", "CustomerAdd2", "CustomerAdd3", "CustomerAdd4"]
-missing_cols = [col for col in required_columns if col not in df.columns]
+missing_cols = [col for col in ADDRESS_COLUMNS if col not in df.columns]
 if missing_cols:
     print(
         f"ERROR: The following required columns are missing from the CSV: {missing_cols}"
@@ -36,17 +38,11 @@ if missing_cols:
 else:
     print("All required address columns are present.")
 
-# Display the first few rows and column names to understand the structure
 print("\nStep 3: Previewing the data (first 5 rows):")
 print(df.head())
 
-# Combine all address fields into a single address string
 print("\nStep 4: Combining address fields into a single column...")
-df["FullAddress"] = (
-    df[["CustomerAdd1", "CustomerAdd2", "CustomerAdd3", "CustomerAdd4"]]
-    .fillna("")
-    .agg(" ".join, axis=1)
-)
+df["FullAddress"] = df[ADDRESS_COLUMNS].fillna("").agg(" ".join, axis=1)
 print("Address fields combined into 'FullAddress'.")
 
 # Extract 5-digit postcode using regex
@@ -67,11 +63,89 @@ print("City and State lookup complete.")
 print("\nStep 6: Sample of Postcode, City, and State:")
 print(df[["Postcode", "City", "State"]].head(10))
 
+# Prepare the final output DataFrame with the required column mapping
+print("\nStep 6b: Remapping columns to the required output structure...")
+
+
+def get_debtor_code(row):
+    if pd.notnull(row.get("CustomerDebtorCodeNew")):
+        return row["CustomerDebtorCodeNew"]
+    elif pd.notnull(row.get("customerDebtorCode")):
+        return row["customerDebtorCode"]
+    return ""
+
+
+output_df = pd.DataFrame(
+    {
+        # --- General Info ---
+        "no": "",
+        "code": df.get("CustomerCode", ""),
+        "name": df.get("CustomerName", ""),
+        "description": "",
+        "status": "activated",
+        "tags": "",
+        "overrideDuplicateCode": True,
+        "types": [COMPANY_TYPES] * len(df),
+        # --- Country & Currency ---
+        "country.name": "Malaysia",
+        "country.alpha3": "MYS",
+        "currency.code": "MYR",
+        "currency.uuid": "",
+        # --- Billing/Creditor ---
+        "billTo.code": "",
+        "billTo.uuid": "",
+        "creditorCode": "",
+        "creditorTerm": df.get("CustomerTerm", ""),
+        # --- Debtor ---
+        "debtorCode": df.apply(get_debtor_code, axis=1),
+        "debtorTerm": "",
+        # --- Tax/Registration ---
+        "taxNumber": "",
+        "registration": "",
+        # --- UUID ---
+        "uuid": "",
+        # --- Address ---
+        "address.name": df.get("CustomerName", ""),
+        "address.type": ADDRESS_TYPE,
+        "address.countryAlpha3": "MYS",
+        "address.address1": df.get("CustomerAdd1", ""),
+        "address.address2": df.get("CustomerAdd2", ""),
+        "address.address3": df.get("CustomerAdd3", ""),
+        "address.address4": df.get("CustomerAdd4", ""),
+        "address.city": df.get("City", ""),
+        "address.district": df.get("City", ""),
+        "address.postCode": df.get("Postcode", ""),
+        "address.areaCode": df.get("areaCode", ""),
+        "address.zone": df.get("zone", ""),
+        "address.location.type": "",
+        "address.location.coordinates": "",
+        "address.phone": df.get("CustomerTel", ""),
+        "address.fax": df.get("CustomerFax", ""),
+        "address.tags": [["isDefault"]] * len(df),
+        "address.status": "activated",
+        "address.uuid": "",
+        "address.zzz": "",
+        # --- Contact ---
+        "contact.name": df.get("CustomerContact", ""),
+        "contact.email": df.get("CustomerEmail", ""),
+        "contact.phone": df.get("CustomerTel", ""),
+        "contact.title": "",
+        "contact.designation": "",
+        "contact.notes": "",
+        "contact.status": "activated",
+        "contact.uuid": "",
+        "contact.zzz": "",
+    }
+)
+
+print("Column remapping complete. Preview of remapped data:")
+print(output_df.head())
+
 # Save the updated DataFrame to a new CSV file (exclude FullAddress)
 print("\nStep 7: Saving the updated data to a new CSV file...")
-output_columns = [col for col in df.columns if col != "FullAddress"]
-df.to_csv(output_file_path, index=False, columns=output_columns)
-print(f"\nSUCCESS: The updated file has been saved as:\n{output_file_path}\n")
+output_columns = [col for col in output_df.columns]
+output_df.to_csv(OUTPUT_FILE_PATH, index=False, columns=output_columns)
+print(f"\nSUCCESS: The updated file has been saved as:\n{OUTPUT_FILE_PATH}\n")
 print(
     "You can now open this file in Excel or another spreadsheet program to review the results."
 )

@@ -56,3 +56,4 @@ dmypy.json
 *.DS_Store
 *.log
 input*.csv
+output*.csv
