@@ -8,15 +8,20 @@ OUTPUT_FILE_PATH = f"./output_{ts}.csv"
 ADDRESS_COLUMNS = ["CustomerAdd1", "CustomerAdd2", "CustomerAdd3", "CustomerAdd4"]
 DEFAULT_IF_REQUIRED_NOT_FOUND = "TBA"
 
-# {'billing', 'customs', 'depot', 'forwarder', 'freightForwarder', 'haulier', 'liner', 'oneTimeVendor', 'port', 'shipperConsignee', 'shippingAgent', 'transporter', 'warehouse'}
-COMPANY_TYPES = ["shipperConsignee"]
+# {'billing', 'customs', 'depot', 'forwarder', 'freightForwarder', 'haulier', 'liner', 'oneTimeVendor', 'port', 'shipperConsignee', 'shippingAgent', 'transporter', 'warehouse', 'transitYard'}
+COMPANY_TYPES = ["billing"]
 
-# {'BILLING', 'CONTACT', 'DELIVERY', 'MAILING', 'WAREHOUSE'}
+# {'BILLING', 'CONTACT', 'DELIVERY', 'MAILING', 'WAREHOUSE', 'DEPOT', 'PORT', 'TRANSIT_YARD'}
 ADDRESS_TYPE = "BILLING"
 
 try:
     print("Step 1: Loading the uploaded CSV file...")
     df = pd.read_csv(INPUT_FILE_PATH)
+    # Replace headers starting with 'Location' to 'Customer'
+    df.columns = [
+        col.replace("Location", "Customer", 1) if col.startswith("Location") else col
+        for col in df.columns
+    ]
     print("CSV file loaded successfully.")
 except FileNotFoundError:
     print(
@@ -88,68 +93,106 @@ name_filled = (
     .apply(lambda x: x if str(x).strip() else DEFAULT_IF_REQUIRED_NOT_FOUND)
 )
 
-output_df = pd.DataFrame(
-    {
-        # --- General Info ---
-        "no": "",
-        "code": df.get("CustomerCode", ""),
-        "name": name_filled,
-        "description": "",
-        "status": "activated",
-        "tags": "",
-        "overrideDuplicateCode": True,
-        "types": COMPANY_TYPES * len(df),
-        # --- Country & Currency ---
-        "country.name": "Malaysia",
-        "country.alpha3": "MYS",
-        "currency.code": "MYR",
-        "currency.uuid": "",
-        # --- Billing/Creditor ---
-        "billTo.code": "",
-        "billTo.uuid": "",
-        "creditorCode": "",
-        "creditorTerm": df.get("CustomerTerm", ""),
-        # --- Debtor ---
-        "debtorCode": df.apply(get_debtor_code, axis=1),
-        "debtorTerm": "",
-        # --- Tax/Registration ---
-        "taxNumber": "",
-        "registration": "",
-        # --- UUID ---
-        "uuid": "",
-        # --- Address ---
-        "address.name": df.get("CustomerName", DEFAULT_IF_REQUIRED_NOT_FOUND),
-        "address.type": ADDRESS_TYPE,
-        "address.countryAlpha3": "MYS",
-        "address.address1": df.get("CustomerAdd1", "").apply(str),
-        "address.address2": df.get("CustomerAdd2", "").apply(str),
-        "address.address3": df.get("CustomerAdd3", "").apply(str),
-        "address.address4": df.get("CustomerAdd4", "").apply(str),
-        "address.city": df.get("City", "").apply(str),
-        "address.district": df.get("City", "").apply(str),
-        "address.postCode": df.get("Postcode", "").apply(str),
-        "address.areaCode": df.get("areaCode", DEFAULT_IF_REQUIRED_NOT_FOUND),
-        "address.zone": df.get("zone", DEFAULT_IF_REQUIRED_NOT_FOUND),
-        "address.location.type": "",
-        "address.location.coordinates": "",
-        "address.phone": df.get("CustomerTel", "").apply(str),
-        "address.fax": df.get("CustomerFax", "").apply(str),
-        "address.tags": ["isDefault"] * len(df),
-        "address.status": "activated",
-        "address.uuid": "",
-        "address.zzz": "",
-        # --- Contact ---
-        "contact.name": df.get("CustomerContact", ""),
-        "contact.email": df.get("CustomerEmail", ""),
-        "contact.phone": df.get("CustomerTel", ""),
-        "contact.title": "",
-        "contact.designation": "",
-        "contact.notes": "",
-        "contact.status": "activated",
-        "contact.uuid": "",
-        "contact.zzz": "",
-    }
+customer_type_series = df.get("CustomerType", pd.Series([""] * len(df))).fillna("")
+type_filled = (
+    customer_type_series.copy()
+    .apply(
+        lambda x: (
+            ["transitYard"]
+            if str(x).strip().upper() == "CONTAINER YARD"
+            else ["port"] if str(x).strip().upper() == "PORT" else COMPANY_TYPES.copy()
+        )
+    )
+    .tolist()
 )
+
+address_type_filled = (
+    df.get("CustomerType", pd.Series([""] * len(df)))
+    .fillna("")
+    .apply(
+        lambda x: (
+            "TRANSIT_YARD"
+            if str(x).strip().upper() == "CONTAINER YARD"
+            else str(x).strip().upper() if str(x).strip() else ADDRESS_TYPE
+        )
+    )
+)
+
+data = {
+    # --- General Info ---
+    "no": "",
+    "code": df.apply(
+        lambda row: (
+            row.get("CustomerID")
+            if pd.notnull(row.get("CustomerID"))
+            else row.get("CustomerCode", "")
+        ),
+        axis=1,
+    ),
+    "name": name_filled,
+    "description": "",
+    "status": "activated",
+    "tags": "",
+    "overrideDuplicateCode": True,
+    "types": type_filled,
+    # --- Country & Currency ---
+    "country.name": "Malaysia",
+    "country.alpha3": "MYS",
+    "currency.code": "MYR",
+    "currency.uuid": "",
+    # --- Billing/Creditor ---
+    "billTo.code": "",
+    "billTo.uuid": "",
+    "creditorCode": "",
+    "creditorTerm": df.get("CustomerTerm", ""),
+    # --- Debtor ---
+    "debtorCode": df.apply(get_debtor_code, axis=1),
+    "debtorTerm": "",
+    # --- Tax/Registration ---
+    "taxNumber": "",
+    "registration": "",
+    # --- UUID ---
+    "uuid": "",
+    # --- Address ---
+    "address.name": df.get("CustomerName", DEFAULT_IF_REQUIRED_NOT_FOUND),
+    "address.type": address_type_filled,
+    "address.countryAlpha3": "MYS",
+    "address.address1": df.get("CustomerAdd1", "").apply(str),
+    "address.address2": df.get("CustomerAdd2", "").apply(str),
+    "address.address3": df.get("CustomerAdd3", "").apply(str),
+    "address.address4": df.get("CustomerAdd4", "").apply(str),
+    "address.city": df.get("City", "").apply(str),
+    "address.district": df.get("City", "").apply(str),
+    "address.postCode": df.get("Postcode", "").apply(str),
+    "address.areaCode": df.get("areaCode", DEFAULT_IF_REQUIRED_NOT_FOUND),
+    "address.zone": df.get("zone", DEFAULT_IF_REQUIRED_NOT_FOUND),
+    "address.location.type": "",
+    "address.location.coordinates": "",
+    "address.phone": df.get("CustomerTel", "").apply(str),
+    "address.fax": df.get("CustomerFax", "").apply(str),
+    "address.tags": ["isDefault"] * len(df),
+    "address.status": "activated",
+    "address.uuid": "",
+    "address.zzz": "",
+    # --- Contact ---
+    "contact.name": df.get("CustomerContact", ""),
+    "contact.email": df.get("CustomerEmail", ""),
+    "contact.phone": df.get("CustomerTel", ""),
+    "contact.title": "",
+    "contact.designation": "",
+    "contact.notes": "",
+    "contact.status": "activated",
+    "contact.uuid": "",
+    "contact.zzz": "",
+}
+
+for key, val in data.items():
+    if hasattr(val, "__len__") and not isinstance(val, str) and len(val) != len(df):
+        print(f"Column length mismatch in: {key} (length {len(val)} vs {len(df)})")
+
+
+output_df = pd.DataFrame(data)
+
 
 print("Column remapping complete. Preview of remapped data:")
 print(output_df.head())
