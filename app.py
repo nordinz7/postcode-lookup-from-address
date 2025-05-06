@@ -1,6 +1,7 @@
 import pandas as pd
 import re
 from datetime import datetime
+import json
 
 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 INPUT_FILE_PATH = "./input.csv"
@@ -93,27 +94,57 @@ name_filled = (
     .apply(lambda x: x if str(x).strip() else DEFAULT_IF_REQUIRED_NOT_FOUND)
 )
 
-customer_type_series = df.get("CustomerType", pd.Series([""] * len(df))).fillna("")
-type_filled = (
-    customer_type_series.copy()
-    .apply(
-        lambda x: (
-            ["transitYard"]
-            if str(x).strip().upper() == "CONTAINER YARD"
-            else ["port"] if str(x).strip().upper() == "PORT" else COMPANY_TYPES.copy()
+customer_type_series = df.get("CustomerType", pd.Series([] * len(df))).fillna("")
+type_filled = customer_type_series.copy().apply(
+    lambda x: (
+        ["transitYard"]
+        if str(x).strip().upper() == "CONTAINER YARD"
+        else (
+            [
+                "billing",
+                "customs",
+                "depot",
+                "forwarder",
+                "freightForwarder",
+                "haulier",
+                "liner",
+                "oneTimeVendor",
+                "port",
+                "shipperConsignee",
+                "shippingAgent",
+                "transporter",
+                "warehouse",
+                "transitYard",
+            ]
+            if str(x).strip().upper() == "ALL"
+            else (
+                ["port"] if str(x).strip().upper() == "PORT" else COMPANY_TYPES.copy()
+            )
         )
     )
-    .tolist()
 )
 
 address_type_filled = (
-    df.get("CustomerType", pd.Series([""] * len(df)))
+    customer_type_series.copy()
     .fillna("")
     .apply(
         lambda x: (
             "TRANSIT_YARD"
             if str(x).strip().upper() == "CONTAINER YARD"
-            else str(x).strip().upper() if str(x).strip() else ADDRESS_TYPE
+            else (
+                [
+                    "BILLING",
+                    "CONTACT",
+                    "DELIVERY",
+                    "MAILING",
+                    "WAREHOUSE",
+                    "DEPOT",
+                    "PORT",
+                    "TRANSIT_YARD",
+                ]
+                if str(x).strip().upper() == "ALL"
+                else str(x).strip().upper() if str(x).strip() else ADDRESS_TYPE
+            )
         )
     )
 )
@@ -192,7 +223,7 @@ for key, val in data.items():
 
 
 output_df = pd.DataFrame(data)
-
+output_df["types"] = output_df["types"].apply(json.dumps)
 
 print("Column remapping complete. Preview of remapped data:")
 print(output_df.head())
